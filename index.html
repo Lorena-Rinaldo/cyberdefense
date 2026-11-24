@@ -1,0 +1,273 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#07111e" />
+  <title>Sentinela | Cyber Defense Hospital</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = { theme: { extend: { fontFamily: { sans: ['Inter', 'ui-sans-serif', 'system-ui'] } } } }
+  </script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <style>
+    :root { color-scheme: dark; --bg:#07111e; --panel:#0d1928; --line:#1d2d40; --muted:#8494a8; --cyan:#38d9f5; --amber:#ffb454; }
+    * { box-sizing: border-box; }
+    body { margin:0; background:var(--bg); color:#eef5fc; font-family:Manrope, sans-serif; }
+    .mono { font-family:'DM Mono', monospace; }
+    .panel { background:linear-gradient(145deg,rgba(16,31,48,.96),rgba(10,21,35,.96)); border:1px solid var(--line); }
+    .grid-bg { background-image:linear-gradient(rgba(97,135,169,.055) 1px,transparent 1px),linear-gradient(90deg,rgba(97,135,169,.055) 1px,transparent 1px); background-size:32px 32px; }
+    #scene { position:absolute; inset:0; overflow:hidden; }
+    #scene canvas { display:block; width:100%; height:100%; }
+    .device-tag { min-width:135px; padding:8px 10px; border:1px solid rgba(255,255,255,.17); background:rgba(7,17,30,.91); border-radius:10px; backdrop-filter:blur(10px); color:#eaf5ff; box-shadow:0 7px 25px rgba(0,0,0,.3); cursor:pointer; transition:transform .18s,border-color .18s,opacity .2s; pointer-events:auto; }
+    .device-tag:hover { transform:translateY(-3px) scale(1.04); border-color:#67e8f9; }
+    .device-tag .tag-title { font-size:10px; font-weight:800; white-space:nowrap; }
+    .device-tag .tag-state { font:9px 'DM Mono',monospace; margin-top:3px; color:#a9b8c8; }
+    .device-tag.vulnerable { border-color:rgba(255,180,84,.8); box-shadow:0 0 18px rgba(255,157,59,.24); }
+    .device-tag.vulnerable .tag-state { color:#ffbd72; }
+    .device-tag.safe .tag-state { color:#5de6d0; }
+    .device-tag.unknown .tag-state { color:#9baec1; }
+    .device-tag.selected { outline:2px solid #6be7f5; outline-offset:2px; }
+    .device-tag.resolved { border-color:rgba(70,220,192,.65); }
+    .device-tag.resolved .tag-state { color:#5de6d0; }
+    .device-tag .dot { display:inline-block; width:6px; height:6px; margin-right:5px; border-radius:50%; background:#9baec1; vertical-align:1px; }
+    .device-tag.vulnerable .dot { background:#ffac52; box-shadow:0 0 8px #ffac52; }
+    .device-tag.safe .dot,.device-tag.resolved .dot { background:#52dfc9; box-shadow:0 0 8px #52dfc9; }
+    #scene { transition:width .35s ease; }
+    #viewport.inspection-mode { position:fixed; inset:0; z-index:60; width:100vw; height:100vh; height:100dvh; min-height:0; border-radius:0; }
+    #viewport.inspection-mode #scene { inset:0 auto 0 0; width:50%; }
+    #viewport.inspection-mode #scene > div { width:100% !important; height:100% !important; }
+    #viewport.inspection-mode #referenceImage { max-height:52vh; }
+    #deviceCompare [class~="text-[8px]"] { font-size:12px !important; }
+    #deviceCompare [class~="text-[9px]"] { font-size:14px !important; }
+    #deviceCompare [class~="text-[10px]"] { font-size:15px !important; }
+    #deviceCompare .text-xs { font-size:16px !important; }
+    #deviceCompare .text-sm { font-size:19px !important; }
+    #observedCard [class~="text-[8px]"] { font-size:12px !important; }
+    #observedCard [class~="text-[9px]"] { font-size:14px !important; }
+    #observedCard [class~="text-[11px]"] { font-size:17px !important; }
+    #viewport.inspection-mode .device-tag { min-width:165px; padding:10px 12px; }
+    #viewport.inspection-mode .device-tag .tag-title { font-size:13px; }
+    #viewport.inspection-mode .device-tag .tag-state { font-size:12px; }
+    #deviceCompare { display:none; }
+    #viewport.inspection-mode #deviceCompare { display:flex; }
+    #observedCard { display:none; }
+    #viewport.inspection-mode #observedCard { display:block; width:calc(50% - 24px); }
+    #viewport.inspection-mode #mapHint { left:10px; right:auto; bottom:10px; }
+    #viewport.inspection-mode #statusLegend { display:none; }
+    #viewport.inspection-mode #mapBadge { display:none; }
+    #viewport.inspection-mode #mapActions { display:none; }
+    body.focus-mode { overflow:hidden; }
+    body.focus-mode main { padding:0 !important; }
+    body:not(.focus-mode) main [class~="text-[8px]"] { font-size:11px !important; }
+    body:not(.focus-mode) main [class~="text-[9px]"] { font-size:12px !important; }
+    body:not(.focus-mode) main [class~="text-[10px]"] { font-size:13px !important; }
+    body:not(.focus-mode) main [class~="text-[11px]"] { font-size:14px !important; }
+    body:not(.focus-mode) main .text-xs { font-size:15px !important; }
+    body:not(.focus-mode) main .text-lg { font-size:22px !important; }
+    body:not(.focus-mode) main > section:first-child h1 { font-size:30px; }
+    @media (max-width:700px) { #viewport.inspection-mode #deviceCompare { padding:10px; gap:9px; } #viewport.inspection-mode #observedCard { top:60px; } }
+    .scroll-thin::-webkit-scrollbar { width:4px; } .scroll-thin::-webkit-scrollbar-thumb { background:#26394e; border-radius:8px; }
+    button:focus-visible { outline:2px solid #67e8f9; outline-offset:2px; }
+    @media (max-width:900px) { .device-tag { min-width:112px; padding:6px 8px; } .device-tag .tag-title{font-size:9px} }
+  </style>
+</head>
+<body class="min-h-screen">
+  <div class="min-h-screen flex flex-col">
+    <main class="flex-1 min-h-0 p-3 md:p-5 lg:px-7 flex flex-col gap-4">
+      <section class="grid grid-cols-2 lg:grid-cols-4 gap-2.5">
+        <div class="panel rounded-xl px-3.5 py-3 flex items-center justify-between"><div><div class="text-[10px] text-slate-500 uppercase tracking-wider">Dispositivos</div><div class="text-lg font-extrabold mt-0.5" id="metricDevices">07</div></div><div class="w-8 h-8 rounded-lg bg-slate-700/40 text-slate-300 flex items-center justify-center">◈</div></div>
+        <div class="panel rounded-xl px-3.5 py-3 flex items-center justify-between"><div><div class="text-[10px] text-slate-500 uppercase tracking-wider">Ameaças detectadas</div><div class="text-lg font-extrabold mt-0.5 text-amber-300"><span id="metricThreats">—</span><span class="text-xs text-slate-600 font-medium"> / 03</span></div></div><div class="w-8 h-8 rounded-lg bg-amber-400/10 text-amber-300 flex items-center justify-center">!</div></div>
+        <div class="panel rounded-xl px-3.5 py-3 flex items-center justify-between"><div><div class="text-[10px] text-slate-500 uppercase tracking-wider">Corrigidos</div><div class="text-lg font-extrabold mt-0.5 text-emerald-300"><span id="metricFixed">00</span><span class="text-xs text-slate-600 font-medium"> / 03</span></div></div><div class="w-8 h-8 rounded-lg bg-emerald-400/10 text-emerald-300 flex items-center justify-center">✓</div></div>
+        <div class="panel rounded-xl px-3.5 py-3 flex items-center justify-between"><div><div class="text-[10px] text-slate-500 uppercase tracking-wider">Integridade da rede</div><div class="text-lg font-extrabold mt-0.5" id="metricIntegrity">Aguardando</div></div><div class="w-8 h-8 rounded-lg bg-cyan-400/10 text-cyan-300 flex items-center justify-center">⌁</div></div>
+      </section>
+
+      <section class="flex-1 min-h-[490px] grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_320px] gap-3">
+        <div id="viewport" class="panel rounded-2xl overflow-hidden relative min-h-[490px] grid-bg">
+          <div id="scene"></div>
+          <div id="mapBadge" class="absolute top-3 left-3 md:top-4 md:left-4 z-[2] pointer-events-none">
+            <div class="px-3 py-2 rounded-xl bg-[#07111e]/85 border border-slate-700/80 backdrop-blur-md"><div class="text-[9px] uppercase tracking-[.18em] text-slate-400">MAPA 3D AO VIVO</div><div class="text-xs font-bold mt-0.5">UTI • Ala Norte <span class="text-cyan-300 ml-1">●</span></div></div>
+          </div>
+          <div id="mapActions" class="absolute top-3 right-3 md:top-4 md:right-4 z-[3] flex items-center gap-2">
+            <button id="resetBtn" class="px-3 py-2 rounded-xl border border-slate-700 bg-[#07111e]/85 text-slate-300 text-xs font-bold backdrop-blur-md hover:bg-slate-800">Reiniciar</button>
+            <button id="helpBtn" class="w-10 h-10 rounded-xl border border-slate-700 bg-[#07111e]/85 text-slate-400 hover:text-white hover:border-cyan-400/60 backdrop-blur-md flex items-center justify-center text-sm font-bold" title="Como jogar" aria-label="Como jogar">?</button>
+          </div>
+          <div id="statusLegend" class="absolute bottom-3 left-3 md:bottom-4 md:left-4 z-[2] flex items-center gap-3 px-3 py-2 rounded-xl bg-[#07111e]/85 border border-slate-700/80 backdrop-blur-md text-[9px] text-slate-400 pointer-events-none"><span class="flex items-center gap-1.5"><i class="w-2 h-2 rounded-full bg-cyan-300"></i> Protegido</span><span class="flex items-center gap-1.5"><i class="w-2 h-2 rounded-full bg-amber-300"></i> Vulnerável</span><span class="flex items-center gap-1.5"><i class="w-2 h-2 rounded-full bg-slate-500"></i> Não verificado</span></div>
+          <div id="mapHint" class="absolute bottom-3 right-3 md:bottom-4 md:right-4 z-[2] text-[9px] text-slate-400 px-2.5 py-1.5 rounded-lg bg-[#07111e]/80 border border-slate-700/80 pointer-events-none">Arraste para girar <span class="text-slate-600">•</span> Scroll para zoom</div>
+          <div id="observedCard" class="absolute top-[68px] left-3 z-[2] rounded-xl bg-[#07111e]/90 border border-cyan-300/30 p-3 backdrop-blur-md pointer-events-none"><div class="text-[8px] uppercase tracking-[.16em] text-cyan-300 font-bold">Leitura do dispositivo</div><div id="observedCheck" class="text-[9px] text-slate-400 mt-2"></div><div id="observedValue" class="text-[11px] text-white font-bold mt-1 leading-snug"></div></div>
+          <div id="deviceCompare" class="absolute top-0 right-0 bottom-0 w-[50%] z-[4] border-l border-slate-700/80 bg-[#091522]/95 backdrop-blur-md p-3 md:p-5 flex-col gap-3 overflow-y-auto scroll-thin">
+            <div class="flex items-start justify-between gap-2"><div><div class="text-[8px] uppercase tracking-[.18em] text-cyan-300 font-bold">Comparação do equipamento</div><div id="compareDeviceName" class="text-sm font-extrabold mt-1">Referência segura</div><div class="text-[9px] text-slate-400 mt-1 leading-relaxed">Valores iguais = protegido; divergência = vulnerável.</div></div><button id="exitInspection" class="shrink-0 px-2.5 py-1.5 rounded-lg border border-slate-700 text-[9px] text-slate-300 hover:border-cyan-300/50 hover:text-white">← Mapa</button></div>
+            <div class="rounded-xl overflow-hidden border border-slate-700 bg-[#0b1724]"><img id="referenceImage" alt="Imagem de referência do equipamento" class="block w-full aspect-[1.7] object-cover"><div class="px-2.5 py-2 border-t border-slate-800 flex items-center justify-between"><span class="text-[8px] uppercase tracking-wider text-slate-500">Padrão recomendado</span><span class="w-2 h-2 rounded-full bg-emerald-300"></span></div></div>
+            <div class="rounded-xl border border-emerald-300/20 bg-emerald-300/[.04] p-3"><div id="referenceCheck" class="text-[8px] uppercase tracking-[.13em] text-emerald-300 font-bold"></div><div id="referenceValue" class="text-[10px] text-slate-100 font-semibold mt-1.5 leading-relaxed"></div></div>
+            <div id="miniGamePanel" class="rounded-xl border border-slate-700 bg-[#0b1724] p-3"></div>
+            <div class="text-[8px] text-slate-500 leading-relaxed">Gire e aproxime o modelo 3D à esquerda para observar o equipamento.</div>
+          </div>
+          <div id="toast" class="absolute top-4 left-1/2 -translate-x-1/2 z-20 px-4 py-2 rounded-xl bg-[#102338] border border-cyan-400/40 text-xs text-cyan-100 shadow-xl opacity-0 transition-opacity pointer-events-none"></div>
+        </div>
+        <aside class="panel rounded-2xl flex flex-col overflow-hidden min-h-[330px]">
+          <div class="px-4 pt-4 pb-3 border-b border-slate-800"><div class="flex items-center justify-between"><div class="text-[10px] uppercase tracking-[.18em] text-slate-400 font-bold">Inventário IoT</div><span class="mono text-[10px] text-slate-500">07 NÓS</span></div><p id="listHint" class="text-[10px] text-slate-500 mt-1.5">Selecione um dispositivo para iniciar a inspeção.</p></div>
+          <div id="deviceList" class="scroll-thin overflow-y-auto p-2 flex-1 space-y-1.5"></div>
+          <div id="detail" class="border-t border-slate-800 p-4 min-h-[173px]">
+            <div class="h-full flex flex-col justify-center items-center text-center"><div class="w-9 h-9 rounded-xl bg-slate-800 text-slate-500 flex items-center justify-center mb-2">⌖</div><div class="text-xs font-bold text-slate-300">Selecione um dispositivo</div><div class="text-[10px] text-slate-500 mt-1">Clique em um marcador no mapa ou na lista.</div></div>
+          </div>
+        </aside>
+      </section>
+      <footer class="flex justify-between text-[9px] text-slate-600 px-1"><span>SIMULAÇÃO EDUCACIONAL • AMBIENTE FICTÍCIO</span><span class="mono">SOC / HOSPITAL • V.1.0</span></footer>
+    </main>
+  </div>
+
+  <div id="helpModal" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/70 p-4">
+    <div class="panel rounded-2xl max-w-md w-full p-5 shadow-2xl"><div class="flex justify-between items-start"><div><div class="text-[10px] tracking-[.2em] text-cyan-300 uppercase font-bold">Briefing da missão</div><h2 class="font-extrabold text-lg mt-1">Como jogar</h2></div><button id="closeHelp" class="text-slate-400 hover:text-white text-xl leading-none" aria-label="Fechar">×</button></div><div class="mt-4 space-y-3 text-xs leading-relaxed text-slate-300"><p><b class="text-white">1.</b> Clique em um equipamento no mapa ou no inventário para centralizá-lo e inspecionar.</p><p><b class="text-white">2.</b> Compare a leitura atual com o padrão recomendado ao lado do modelo 3D. Valores iguais indicam proteção; divergências indicam vulnerabilidade.</p><p><b class="text-white">3.</b> Resolva o minijogo específico de cada equipamento. Identifique e corrija os três vulneráveis.</p><p class="text-slate-500">Arraste para girar o hospital ou o equipamento ampliado. Use a roda ou pinça para ajustar o zoom.</p></div><button id="okHelp" class="mt-5 w-full rounded-xl bg-cyan-300 text-[#08202a] py-2.5 text-xs font-extrabold">Entendi</button></div>
+  </div>
+
+  <script type="importmap">
+    { "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.161.0/build/three.module.js" } }
+  </script>
+  <script type="module">
+    import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.161.0/build/three.module.js';
+    import { OrbitControls } from 'https://cdn.jsdelivr.net/npm/three@0.161.0/examples/jsm/controls/OrbitControls.js';
+    import { CSS2DRenderer, CSS2DObject } from 'https://cdn.jsdelivr.net/npm/three@0.161.0/examples/jsm/renderers/CSS2DRenderer.js';
+
+    const initialDevices = [
+      {id:'MON-01',name:'Monitor cardíaco',type:'Monitor de sinais vitais',pos:[-2.4,1.45,-1.65],icon:'♥',vulnerable:false,issue:'Firmware atualizado • comunicação criptografada',check:'Criptografia do tráfego',observed:'TLS 1.3 ativo',recommended:'TLS 1.3 ativo'},
+      {id:'INF-02',name:'Bomba de infusão',type:'Bomba de infusão inteligente',pos:[-1.45,1.35,-1.6],icon:'＋',vulnerable:true,issue:'Firmware desatualizado • acesso remoto sem autenticação',check:'Versão do firmware',observed:'Versão 1.2.0 • atualização pendente',recommended:'Versão 2.4.1 ou superior'},
+      {id:'VEN-03',name:'Ventilador pulmonar',type:'Ventilador pulmonar conectado',pos:[2.25,1.5,-1.4],icon:'〰',vulnerable:false,issue:'Segmentação de rede ativa • tráfego autenticado',check:'Segmentação da rede',observed:'Segmento clínico isolado',recommended:'Segmento clínico isolado'},
+      {id:'PMP-04',name:'Bomba de infusão',type:'Bomba de infusão inteligente',pos:[2.8,1.2,.4],icon:'＋',vulnerable:true,issue:'Credenciais padrão detectadas • senha administrativa fraca',check:'Credenciais administrativas',observed:'Usuário admin • senha padrão',recommended:'Credencial exclusiva • senha padrão alterada'},
+      {id:'GAT-05',name:'Gateway IoT',type:'Gateway de dispositivos médicos',pos:[-3.35,1.35,.35],icon:'⌁',vulnerable:true,issue:'Porta de diagnóstico exposta • serviço não essencial ativo',check:'Porta de diagnóstico 23',observed:'Aberta e acessível',recommended:'Fechada quando não estiver em uso'},
+      {id:'TAB-06',name:'Tablet clínico',type:'Estação móvel de enfermagem',pos:[-2.55,1.2,1.8],icon:'▣',vulnerable:false,issue:'Gerenciamento central ativo • disco criptografado',check:'Criptografia do armazenamento',observed:'Ativada • gerenciamento central',recommended:'Ativada • gerenciamento central'},
+      {id:'SEN-07',name:'Sensor ambiental',type:'Sensor de temperatura e umidade',pos:[3.35,1.85,1.75],icon:'◉',vulnerable:false,issue:'Chaves rotacionadas • firmware assinado',check:'Validação do firmware',observed:'Assinatura SHA256 8C:41:AF:09',recommended:'CA Hospital São Lucas • 8C:41:AF:09'}
+    ].map(d=>({...d,scanned:false,identified:false,guessWrong:false,fixed:false}));
+    let devices = structuredClone(initialDevices), selectedId=null;
+    const sceneEl=document.getElementById('scene'), viewport=document.getElementById('viewport');
+    const scene=new THREE.Scene(); scene.background=new THREE.Color('#0b1725');
+    const camera=new THREE.PerspectiveCamera(40,1,.1,100); camera.position.set(7.7,7.2,9.6);
+    const renderer=new THREE.WebGLRenderer({antialias:true,alpha:false}); renderer.setPixelRatio(Math.min(devicePixelRatio,2)); renderer.shadowMap.enabled=true; renderer.shadowMap.type=THREE.PCFSoftShadowMap; renderer.outputColorSpace=THREE.SRGBColorSpace; renderer.toneMapping=THREE.ACESFilmicToneMapping; renderer.toneMappingExposure=1.15; sceneEl.appendChild(renderer.domElement);
+    const labels=new CSS2DRenderer(); labels.domElement.style.position='absolute'; labels.domElement.style.inset='0'; labels.domElement.style.pointerEvents='none'; sceneEl.appendChild(labels.domElement);
+    const controls=new OrbitControls(camera,renderer.domElement); controls.target.set(0,1,0); controls.enableDamping=true; controls.dampingFactor=.07; controls.minDistance=2.1; controls.maxDistance=17; controls.maxPolarAngle=Math.PI*.48; controls.minPolarAngle=.17;
+    scene.add(new THREE.HemisphereLight(0xbcdcff,0x243346,2.0));
+    const key=new THREE.DirectionalLight(0xe0f3ff,3.1); key.position.set(-3,9,5); key.castShadow=true; key.shadow.mapSize.set(2048,2048); scene.add(key);
+    const fill=new THREE.PointLight(0x45d7e8,36,14); fill.position.set(0,4,0); scene.add(fill);
+    const warm=new THREE.PointLight(0xffd29b,11,9); warm.position.set(3,3,2); scene.add(warm);
+    const mat=(color,rough=.75,metal=0)=>new THREE.MeshStandardMaterial({color,roughness:rough,metalness:metal});
+    const warnMat=new THREE.MeshStandardMaterial({color:'#ff9e3d',emissive:'#ff7626',emissiveIntensity:2.3,roughness:.3});
+    const floorMat=mat('#b5c5cc',.88), wallMat=mat('#d6e0df'), white=mat('#eef4f3'), dark=mat('#273846',.65), steel=mat('#aabac1',.42,.42), teal=mat('#32aab4',.44), glass=new THREE.MeshStandardMaterial({color:'#78b8c7',roughness:.18,metalness:.18,transparent:true,opacity:.4});
+    function box(parent,name,x,y,z,w,h,d,material,cast=true){const m=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),material);m.name=name;m.position.set(x,y,z);m.castShadow=cast;m.receiveShadow=true;parent.add(m);return m;}
+    // Room shell: full back and side walls, low front wall so orbiting stays readable.
+    box(scene,'floor',0,-.12,0,9,.24,7,floorMat,false);
+    box(scene,'back wall',0,1.9,-3.55,9,3.8,.16,wallMat,false);
+    box(scene,'left wall',-4.48,1.9,0,.16,3.8,7,wallMat,false);
+    box(scene,'right wall',4.48,1.9,0,.16,3.8,7,wallMat,false);
+    box(scene,'front half wall',0,.54,3.48,9,1.08,.16,wallMat,false);
+    // Floor tiles and room zoning.
+    for(let x=-4;x<=4;x+=1) box(scene,'floor seam',x,.005,0,.012,.008,6.8,mat('#9cabb2'),false);
+    for(let z=-3;z<=3;z+=1) box(scene,'floor seam',0,.006,z,8.8,.008,.012,mat('#9cabb2'),false);
+    box(scene,'patient zone',0,.012,-.55,6.4,.012,4.9,mat('#b8d7d6'),false);
+    box(scene,'ceiling light',0,3.72,-.8,2.8,.025,.62,mat('#f7ffff',.3),false);
+    // Back wall details: window, wall rail, room sign.
+    box(scene,'window frame',-.45,2.55,-3.43,2.45,1.05,.07,steel,false); box(scene,'window',-.45,2.55,-3.385,2.3,.88,.025,glass,false); box(scene,'window divider',-.45,2.55,-3.35,.035,.9,.025,white,false);
+    box(scene,'wall rail',1.65,1.34,-3.42,3.6,.1,.1,steel,false); box(scene,'room placard',3.25,3.12,-3.42,1.2,.45,.08,dark,false);
+    // Bed, mattress, pillow, headboard and supports.
+    box(scene,'bed frame',.15,.62,-.65,2.25,.16,3.25,steel); box(scene,'mattress',.15,.82,-.65,2.14,.3,3.12,white); box(scene,'sheet',.15,.99,-.38,2.08,.08,2.16,mat('#d8f0ec'));
+    box(scene,'pillow',.15,1.03,-1.83,1.15,.16,.62,mat('#f7fbfa')); box(scene,'headboard',.15,.84,-2.34,2.45,1.05,.12,teal);
+    box(scene,'bed foot',.15,.95,.99,2.35,.15,.13,steel);
+    for(const x of [-.78,1.08]) for(const z of [-1.93,.67]) { const leg=new THREE.Mesh(new THREE.CylinderGeometry(.045,.055,.6,10),steel);leg.position.set(x,.3,z);leg.castShadow=true;scene.add(leg); }
+    // Bedside monitor stand and screen.
+    box(scene,'monitor cart base',-2.37,.18,-1.58,.68,.12,.62,dark); const pole=new THREE.Mesh(new THREE.CylinderGeometry(.045,.055,1.15,12),steel);pole.position.set(-2.37,.75,-1.58);scene.add(pole);
+    box(scene,'cardiac monitor',-2.37,1.48,-1.58,.78,.58,.18,dark); box(scene,'monitor screen',-2.37,1.49,-1.475,.66,.42,.018,mat('#102d39',.25));
+    // Infusion stand with two pump units.
+    const stand=new THREE.Mesh(new THREE.CylinderGeometry(.035,.04,1.55,10),steel);stand.position.set(-1.42,.94,-1.62);scene.add(stand);
+    for(let i=0;i<2;i++){box(scene,'infusion pump',-1.42,1.38+i*.43,-1.62,.43,.33,.31,white);box(scene,'pump screen',-1.42,1.42+i*.43,-1.445,.25,.13,.018,mat('#12323a',.24));}
+    const anomalyById=Object.create(null);
+    const infAlert=new THREE.Mesh(new THREE.SphereGeometry(.045,12,10),warnMat);infAlert.position.set(-1.26,1.43,-1.43);infAlert.visible=false;scene.add(infAlert);anomalyById['INF-02']=infAlert;devices.find(d=>d.id==='INF-02').anomaly=infAlert;
+    // Ventilator on wheeled base.
+    box(scene,'ventilator base',2.25,.21,-1.38,.75,.12,.65,dark);const ventPole=new THREE.Mesh(new THREE.CylinderGeometry(.04,.05,.45,10),steel);ventPole.position.set(2.25,.48,-1.38);scene.add(ventPole);
+    box(scene,'ventilator body',2.25,1.18,-1.38,.78,1.18,.58,white);box(scene,'ventilator display',2.25,1.37,-1.075,.52,.42,.025,mat('#102c37',.22));box(scene,'vent screen glow',2.25,1.4,-1.055,.37,.045,.01,teal,false);
+    const tube=new THREE.Mesh(new THREE.TorusGeometry(.22,.025,8,32,Math.PI*1.4),mat('#56c1c6'));tube.position.set(2.49,.97,-.97);tube.rotation.x=Math.PI/2;scene.add(tube);
+    // Second pump and tablet on carts.
+    box(scene,'second pump cart',2.83,.17,.44,.58,.12,.48,dark);const p2=new THREE.Mesh(new THREE.CylinderGeometry(.035,.045,1.15,10),steel);p2.position.set(2.83,.74,.44);scene.add(p2);box(scene,'second infusion pump',2.83,1.36,.44,.48,.53,.38,white);box(scene,'pump display',2.83,1.43,.64,.29,.16,.02,mat('#12323a',.24));
+    const pumpAlert=new THREE.Mesh(new THREE.SphereGeometry(.04,12,10),warnMat);pumpAlert.position.set(2.98,1.45,.665);pumpAlert.visible=false;scene.add(pumpAlert);anomalyById['PMP-04']=pumpAlert;devices.find(d=>d.id==='PMP-04').anomaly=pumpAlert;
+    box(scene,'tablet cart',-2.62,.15,1.8,.7,.1,.6,dark);const tp=new THREE.Mesh(new THREE.CylinderGeometry(.04,.05,.8,10),steel);tp.position.set(-2.62,.58,1.8);scene.add(tp);box(scene,'tablet',-2.62,1.12,1.8,.57,.42,.11,dark);box(scene,'tablet screen',-2.62,1.12,1.74,.46,.31,.018,mat('#173943',.2));
+    // IoT gateway shelf, sensor, cabinet, door, cart and biomedical wall decor.
+    box(scene,'gateway shelf',-3.35,.65,.35,.72,.1,.62,steel);box(scene,'gateway',-3.35,1.05,.35,.48,.62,.42,dark);box(scene,'gateway face',-3.35,1.05,.13,.34,.36,.02,mat('#102632',.3));const gatePort=new THREE.Mesh(new THREE.BoxGeometry(.075,.045,.025),warnMat);gatePort.position.set(-3.42,.99,.105);gatePort.visible=false;scene.add(gatePort);anomalyById['GAT-05']=gatePort;devices.find(d=>d.id==='GAT-05').anomaly=gatePort;
+    box(scene,'cabinet',3.46,1.18,-2.42,1.25,2.25,.75,white);box(scene,'cabinet door',3.46,1.18,-2.02,1.12,2.1,.08,mat('#dbe7e6'));box(scene,'cabinet handle',3.9,1.17,-1.96,.035,.38,.035,steel);
+    box(scene,'sensor body',3.35,2.8,1.75,.35,.38,.18,white);box(scene,'sensor lens',3.35,2.8,1.645,.13,.13,.018,teal,false);
+    box(scene,'door frame',-3.3,1.05,3.35,1.5,2.2,.1,steel,false);box(scene,'door',-3.3,1.04,3.29,1.34,2.05,.08,mat('#b7cbc9'),false);const knob=new THREE.Mesh(new THREE.SphereGeometry(.055,12,10),steel);knob.position.set(-2.78,1.02,3.21);scene.add(knob);
+    // Floating scene title and reassuring clinical cues.
+    const sign=box(scene,'ward sign',0,3.26,-3.4,1.65,.42,.08,teal,false);
+    // Device markers: bright, large, clickable callouts keep the game objective in view.
+    const markerObjects=[];
+    function markerFor(d){const el=document.createElement('button');el.className='device-tag unknown';el.innerHTML=`<div class="tag-title"><span class="dot"></span>${d.name}</div><div class="tag-state">${d.id} · NÃO VERIFICADO</div>`;el.setAttribute('aria-label',`${d.name}, ${d.id}`);el.addEventListener('click',e=>{e.stopPropagation();selectDevice(d.id)});const obj=new CSS2DObject(el);obj.position.set(...d.pos);scene.add(obj);d.marker=obj;d.element=el;markerObjects.push(d);}
+    devices.forEach(markerFor);
+    function resize(){const w=sceneEl.clientWidth,h=sceneEl.clientHeight;if(!w||!h)return;camera.aspect=w/h;camera.updateProjectionMatrix();renderer.setSize(w,h);labels.setSize(w,h);}
+    new ResizeObserver(resize).observe(sceneEl); resize();
+
+    const list=document.getElementById('deviceList'), detail=document.getElementById('detail');
+    function statusLabel(d){return d.fixed?'CORRIGIDO':!d.scanned?'NÃO INSPECIONADO':!d.identified?'EM ANÁLISE':d.vulnerable?'VULNERÁVEL':'PROTEGIDO';}
+    function statusClass(d){return d.fixed?'resolved':!d.identified?'unknown':d.vulnerable?'vulnerable':'safe';}
+    function render(){
+      list.innerHTML='';
+      devices.forEach(d=>{
+        const row=document.createElement('button');row.className=`w-full text-left rounded-xl px-3 py-2.5 border transition ${selectedId===d.id?'border-cyan-400/60 bg-cyan-400/[.07]':'border-transparent hover:border-slate-700 hover:bg-slate-800/50'}`;
+        const color=d.fixed||d.identified&&!d.vulnerable?'text-emerald-300':d.identified&&d.vulnerable?'text-amber-300':'text-slate-500';
+        row.innerHTML=`<div class="flex items-center justify-between gap-2"><span class="text-[11px] font-bold text-slate-200">${d.name}</span><span class="text-[8px] mono ${color}">${statusLabel(d)}</span></div><div class="text-[9px] mono text-slate-600 mt-1">${d.id} <span class="text-slate-700">/</span> ${d.type}</div>`;
+        row.addEventListener('click',()=>selectDevice(d.id));list.appendChild(row);
+      });
+      const found=devices.filter(d=>d.identified&&d.vulnerable).length;
+      const inspected=devices.filter(d=>d.identified).length;
+      document.getElementById('metricThreats').textContent=String(found).padStart(2,'0');
+      document.getElementById('metricFixed').textContent=String(devices.filter(d=>d.fixed).length).padStart(2,'0');
+      const fixed=devices.filter(d=>d.fixed).length;
+      document.getElementById('metricIntegrity').textContent=inspected===0?'Aguardando':fixed===3?'Segura':found>fixed?'Em risco':inspected===devices.length?'Monitorada':'Em análise';
+      document.getElementById('listHint').textContent=selectedId?'Escolha outro dispositivo para continuar.':'Selecione um dispositivo para iniciar a inspeção.';
+      devices.forEach(d=>{d.element.className=`device-tag ${statusClass(d)} ${selectedId===d.id?'selected':''}`;d.element.querySelector('.tag-state').textContent=`${d.id} · ${statusLabel(d)}`;});
+      if(selectedId) renderDetail(devices.find(d=>d.id===selectedId));
+      else detail.innerHTML='<div class="h-full flex flex-col justify-center items-center text-center"><div class="w-9 h-9 rounded-xl bg-slate-800 text-slate-500 flex items-center justify-center mb-2">⌖</div><div class="text-xs font-bold text-slate-300">Selecione um dispositivo</div><div class="text-[10px] text-slate-500 mt-1">Clique em um marcador no mapa ou na lista.</div></div>';
+    }
+    function referenceSvg(d){
+      const deviceShape=d.id.startsWith('MON')?'<rect x="83" y="35" width="74" height="54" rx="7"/><path d="M99 61h10l7-12 9 24 8-14h12"/><path d="M111 91v14m18-14v14m-29 0h40"/>':d.id.startsWith('INF')||d.id.startsWith('PMP')?'<rect x="91" y="28" width="58" height="72" rx="8"/><rect x="101" y="38" width="38" height="18" rx="3"/><path d="M107 47h25M103 68h34M107 79h26M120 100v12m-17 0h34"/>':d.id.startsWith('VEN')?'<rect x="75" y="27" width="90" height="81" rx="9"/><rect x="88" y="38" width="64" height="31" rx="4"/><path d="M94 54h12l7-8 9 17 9-12h12m-39 28h37m-37 9h27"/>':d.id.startsWith('TAB')?'<rect x="81" y="27" width="78" height="72" rx="8"/><rect x="89" y="35" width="62" height="54" rx="3"/><circle cx="120" cy="94" r="2"/>':d.id.startsWith('GAT')?'<rect x="78" y="39" width="84" height="54" rx="7"/><path d="M92 52h56M92 64h56M92 76h29"/><circle cx="143" cy="77" r="3"/>':'<rect x="91" y="32" width="58" height="72" rx="12"/><circle cx="120" cy="63" r="13"/><path d="M120 47v8m0 16v8m-16-16h8m16 0h8"/>';
+      const accent='#55dec7';
+      const svg=`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 140"><defs><linearGradient id="bg" x2="1" y2="1"><stop stop-color="#132c3b"/><stop offset="1" stop-color="#0b1826"/></linearGradient><filter id="glow"><feGaussianBlur stdDeviation="3" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter></defs><rect width="240" height="140" rx="12" fill="url(#bg)"/><path d="M0 111h240M24 0v140m48-140v140m48-140v140m48-140v140m48-140v140" stroke="#294052" stroke-width=".7" opacity=".48"/><g fill="#132633" stroke="#80a6b4" stroke-width="2" stroke-linejoin="round">${deviceShape}</g><circle cx="120" cy="63" r="34" fill="none" stroke="${accent}" stroke-dasharray="3 4" opacity=".9"/><circle cx="120" cy="63" r="4" fill="${accent}" filter="url(#glow)"/><path d="M148 39h42v-12" fill="none" stroke="${accent}" stroke-width="1.5"/><rect x="164" y="10" width="65" height="19" rx="5" fill="#0c1b29" stroke="${accent}"/><text x="196.5" y="23" text-anchor="middle" font-family="monospace" font-size="7.5" fill="${accent}">INSPECIONAR</text><text x="14" y="128" font-family="monospace" font-size="8" fill="#91a8b8">PADRÃO SEGURO • ${d.id}</text><circle cx="220" cy="119" r="4" fill="${accent}"/></svg>`;
+      return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
+    }
+    function miniGameMarkup(d){
+      const wrap=(question,body)=>`<div class="mt-3 rounded-xl border border-slate-700 bg-[#0a1623] p-3"><div class="text-[8px] uppercase tracking-[.15em] text-cyan-300 font-bold">Desafio de análise</div><div class="text-[10px] text-slate-200 font-bold mt-1.5">${question}</div>${body}${d.guessWrong?'<div class="text-[9px] text-amber-300 mt-2">Essa não é a leitura correta. Confira o modelo e tente outra opção.</div>':''}</div>`;
+      const option=(action,label,detail='')=>`<button data-game-action="${action}" class="gameChoice text-left rounded-lg border border-slate-700 bg-slate-800/50 hover:border-cyan-300/60 hover:bg-cyan-300/[.06] px-2.5 py-2"><span class="block text-[9px] text-slate-100 font-bold">${label}</span>${detail?`<span class="block text-[8px] text-slate-500 mt-1">${detail}</span>`:''}</button>`;
+      switch(d.id){
+        case 'MON-01': return wrap('Qual fluxo protege os dados do paciente?',`<div class="grid grid-cols-1 gap-1.5 mt-2">${option('http','HTTP • texto visível','GET /patient/vitals  |  sem criptografia')}${option('tls','TLS 1.3 • sessão cifrada','TLS_AES_256_GCM  |  certificado válido')}</div>`);
+        case 'INF-02': return wrap('A bomba está abaixo da versão recomendada. Escolha o firmware em execução:',`<div class="grid grid-cols-2 gap-1.5 mt-2">${option('1.2.0','v1.2.0','Instalado no equipamento')}${option('2.4.1','v2.4.1','Pacote recomendado')}</div>`);
+        case 'VEN-03': return wrap('Em qual segmento a ventilação clínica deve permanecer?',`<div class="grid grid-cols-1 gap-1.5 mt-2"><div class="text-[8px] mono text-slate-500">VENTILADOR <span class="text-cyan-300">→</span> SELECIONE A ROTA</div>${option('guest','Wi-Fi de visitantes','Acesso público à internet')}${option('clinical','IoMT clínico isolado','Acesso restrito aos sistemas hospitalares')}</div>`);
+        case 'PMP-04': return wrap('Auditoria de credenciais: qual par corresponde ao acesso encontrado?',`<div class="grid grid-cols-2 gap-1.5 mt-2">${option('unique','enf_uti_04','Senha individual • cofre corporativo')}${option('default','admin / admin','Credencial padrão de fábrica')}</div>`);
+        case 'GAT-05': return wrap('Toque na porta de diagnóstico que está aberta sem necessidade:',`<div class="grid grid-cols-2 gap-2 mt-2">${option('443','443 • HTTPS','Necessária • protegida')}${option('23','23 • Telnet','Acesso remoto em texto puro')}</div>`);
+        case 'TAB-06': return wrap('Teste o controle de criptografia: ative a proteção para validar o armazenamento.',`<label class="mt-3 flex items-center justify-between rounded-lg border border-slate-700 bg-slate-800/50 px-3 py-2.5 cursor-pointer"><span><span class="block text-[9px] font-bold text-slate-100">Criptografia AES-256</span><span class="block text-[8px] text-slate-500 mt-1">Chave gerenciada pelo hospital</span></span><input id="encryptionToggle" type="checkbox" class="w-4 h-4 accent-emerald-400"></label><button id="checkEncryption" class="w-full mt-2 rounded-lg border border-cyan-300/30 py-2 text-[9px] font-bold text-cyan-200 hover:bg-cyan-300/10">Validar configuração</button>`);
+        case 'SEN-07': return wrap('Valide a assinatura digital: digite a impressão SHA256 observada no dispositivo.',`<div class="mt-2 rounded-lg border border-slate-700 bg-slate-800/50 p-2.5"><div class="text-[8px] text-slate-500">CERTIFICADO • HOSPITAL SÃO LUCAS</div><div class="mono text-[9px] text-emerald-300 mt-1">Compare com a referência segura →</div></div><input id="signatureInput" autocomplete="off" spellcheck="false" placeholder="Digite a impressão digital" class="w-full mt-2 rounded-lg bg-slate-950 border border-slate-700 px-2.5 py-2 text-[9px] mono text-slate-100 placeholder:text-slate-600"><button id="signatureSubmit" class="w-full mt-2 rounded-lg border border-cyan-300/30 py-2 text-[9px] font-bold text-cyan-200 hover:bg-cyan-300/10">Validar assinatura</button>`);
+      }
+    }
+    function renderDetail(d){if(!d)return;const vulnerable=d.identified&&d.vulnerable&&!d.fixed;const title=d.fixed?'Dispositivo corrigido':vulnerable?'Vulnerabilidade identificada':d.identified?'Dispositivo protegido':'Minijogo • '+d.check;const note=d.fixed?'Correção aplicada. O dispositivo está protegido e a rede foi atualizada.':vulnerable?d.issue:d.identified?'Análise concluída: a leitura corresponde ao padrão recomendado.':'Conclua o desafio específico para registrar a análise deste dispositivo.';
+      detail.innerHTML=`<div class="text-[9px] mono text-slate-500">${d.id} / ${d.type}</div><div class="text-xs font-extrabold mt-1">${title}</div><p class="text-[10px] text-slate-400 leading-relaxed mt-2">${note}</p>`;
+      const game=!d.identified?miniGameMarkup(d):'';
+      document.getElementById('miniGamePanel').innerHTML=`<div class="flex items-center justify-between gap-2"><div><div class="text-[8px] uppercase tracking-[.15em] text-cyan-300 font-bold">Minijogo de análise</div><div class="text-xs text-white font-extrabold mt-1">${d.check}</div></div><span class="text-[8px] mono px-2 py-1 rounded-md ${vulnerable?'bg-amber-400/10 text-amber-300':d.identified?'bg-emerald-400/10 text-emerald-300':'bg-slate-800 text-slate-400'}">${statusLabel(d)}</span></div><p class="text-[9px] text-slate-400 leading-relaxed mt-2">${note}</p>${game}${vulnerable?'<button id="fixBtn" class="w-full mt-3 rounded-lg py-2.5 bg-amber-300 hover:bg-amber-200 text-[#281806] text-[10px] font-extrabold">Isolar e corrigir</button>':d.fixed?'<div class="mt-3 rounded-lg py-2 text-center bg-emerald-400/10 text-emerald-300 text-[10px] font-bold">✓ Correção confirmada</div>':''}`;
+      const panel=document.getElementById('miniGamePanel');
+      panel.querySelectorAll('[data-game-action]').forEach(button=>button.addEventListener('click',()=>playMiniGame(d.id,button.dataset.gameAction)));
+      document.getElementById('checkEncryption')?.addEventListener('click',()=>playMiniGame(d.id,document.getElementById('encryptionToggle').checked?'encrypted':'plain'));
+      document.getElementById('signatureSubmit')?.addEventListener('click',()=>playMiniGame(d.id,document.getElementById('signatureInput').value.trim().toUpperCase()));
+      document.getElementById('fixBtn')?.addEventListener('click',()=>fixDevice(d.id));
+    }
+    let cameraMove=null;
+    const focusPoints={'MON-01':[-2.37,1.48,-1.58],'INF-02':[-1.42,1.38,-1.62],'VEN-03':[2.25,1.18,-1.38],'PMP-04':[2.83,1.36,.44],'GAT-05':[-3.35,1.05,.35],'TAB-06':[-2.62,1.12,1.8],'SEN-07':[3.35,2.8,1.75]};
+    function moveCamera(target,position){cameraMove={target:new THREE.Vector3(...target),position:new THREE.Vector3(...position),startTarget:controls.target.clone(),startPosition:camera.position.clone(),started:performance.now()};}
+    function resetCamera(){selectedId=null;devices.forEach(d=>{if(d.anomaly)d.anomaly.visible=false;});viewport.classList.remove('inspection-mode');document.body.classList.remove('focus-mode');if(document.fullscreenElement===viewport)document.exitFullscreen?.().catch(()=>{});moveCamera([0,1,0],[7.7,7.2,9.6]);document.getElementById('mapHint').innerHTML='Arraste para girar <span class="text-slate-600">•</span> Scroll para zoom';render();}
+    function selectDevice(id){const d=devices.find(x=>x.id===id);if(!d)return;selectedId=id;d.scanned=true;devices.forEach(x=>{if(x.anomaly)x.anomaly.visible=false;});if(d.anomaly&&!d.fixed)d.anomaly.visible=true;viewport.classList.add('inspection-mode');document.body.classList.add('focus-mode');if(!document.fullscreenElement)viewport.requestFullscreen?.().catch(()=>{});document.getElementById('compareDeviceName').textContent=d.name;document.getElementById('referenceImage').src=referenceSvg(d);document.getElementById('referenceImage').alt=`Referência segura de ${d.name}`;document.getElementById('referenceCheck').textContent=d.check;document.getElementById('referenceValue').textContent=d.recommended;document.getElementById('observedCheck').textContent=d.check;document.getElementById('observedValue').textContent=d.observed;const p=new THREE.Vector3(...(focusPoints[d.id]||d.pos));const inward=new THREE.Vector3(-p.x,0,-p.z).normalize();const distance=2.75;const target=[p.x,p.y,p.z];const position=[THREE.MathUtils.clamp(p.x+inward.x*distance,-3.55,3.55),p.y+1.55,THREE.MathUtils.clamp(p.z+inward.z*distance,-2.65,2.65)];moveCamera(target,position);document.getElementById('mapHint').textContent='Arraste para girar o modelo • Scroll para zoom';render();}
+    function playMiniGame(id,action){const d=devices.find(x=>x.id===id);if(!d||d.identified)return;const answers={'MON-01':'tls','INF-02':'1.2.0','VEN-03':'clinical','PMP-04':'default','GAT-05':'23','TAB-06':'encrypted','SEN-07':'8C:41:AF:09'};if(action===answers[id]){d.identified=true;d.guessWrong=false;render();showToast(d.vulnerable?'Anomalia confirmada • dispositivo vulnerável':'Verificação concluída • dispositivo protegido');}else{d.guessWrong=true;render();showToast('Essa opção não corresponde à leitura do equipamento');}}
+    function showToast(message){const t=document.getElementById('toast');t.textContent=message;t.style.opacity='1';clearTimeout(showToast.timer);showToast.timer=setTimeout(()=>t.style.opacity='0',2300);}
+    function fixDevice(id){const d=devices.find(x=>x.id===id);if(!d||!d.identified||!d.vulnerable||d.fixed)return;d.fixed=true;if(d.anomaly)d.anomaly.visible=false;render();showToast(`${d.name} isolado e corrigido`);if(devices.filter(x=>x.vulnerable).every(x=>x.fixed)){showToast('Missão concluída • rede hospitalar protegida');}}
+    document.getElementById('exitInspection').addEventListener('click',resetCamera);
+    document.addEventListener('keydown',e=>{if(e.key==='Escape'&&selectedId)resetCamera();});
+    document.getElementById('resetBtn').addEventListener('click',()=>{devices.forEach(d=>scene.remove(d.marker));Object.values(anomalyById).forEach(a=>a.visible=false);devices=structuredClone(initialDevices);devices.forEach(d=>d.anomaly=anomalyById[d.id]);devices.forEach(markerFor);selectedId=null;viewport.classList.remove('inspection-mode');document.body.classList.remove('focus-mode');moveCamera([0,1,0],[7.7,7.2,9.6]);document.getElementById('mapHint').innerHTML='Arraste para girar <span class="text-slate-600">•</span> Scroll para zoom';detail.innerHTML='<div class="h-full flex flex-col justify-center items-center text-center"><div class="w-9 h-9 rounded-xl bg-slate-800 text-slate-500 flex items-center justify-center mb-2">⌖</div><div class="text-xs font-bold text-slate-300">Selecione um dispositivo</div><div class="text-[10px] text-slate-500 mt-1">Clique em um marcador no mapa ou na lista.</div></div>';render();showToast('Simulação reiniciada');});
+    const modal=document.getElementById('helpModal');const openHelp=()=>{modal.classList.remove('hidden');modal.classList.add('flex')};const closeHelp=()=>{modal.classList.add('hidden');modal.classList.remove('flex')};document.getElementById('helpBtn').addEventListener('click',openHelp);document.getElementById('closeHelp').addEventListener('click',closeHelp);document.getElementById('okHelp').addEventListener('click',closeHelp);modal.addEventListener('click',e=>{if(e.target===modal)closeHelp()});
+    render();
+    function animate(){requestAnimationFrame(animate);if(cameraMove){const t=Math.min((performance.now()-cameraMove.started)/850,1);const ease=1-Math.pow(1-t,3);camera.position.lerpVectors(cameraMove.startPosition,cameraMove.position,ease);controls.target.lerpVectors(cameraMove.startTarget,cameraMove.target,ease);if(t===1)cameraMove=null;}controls.update();renderer.render(scene,camera);labels.render(scene,camera);} animate();
+  </script>
+</body>
+</html>
